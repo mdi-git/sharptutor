@@ -32,6 +32,7 @@ def parse_args():
     parser.add_argument("--lora_alpha", type=int, default=32)
     parser.add_argument("--lora_dropout", type=float, default=0.05)
     parser.add_argument("--use_bf16", action="store_true")
+    parser.add_argument("--report_to", default="none")
     parser.add_argument("--push_to_hub", action="store_true")
     parser.add_argument("--hub_model_id", default=None)
     return parser.parse_args()
@@ -118,7 +119,7 @@ def main():
         optim="paged_adamw_8bit",
         lr_scheduler_type="cosine",
         max_grad_norm=0.3,
-        report_to="tensorboard",
+        report_to=args.report_to,
         push_to_hub=args.push_to_hub,
         hub_model_id=args.hub_model_id,
         max_length=args.max_seq_length,
