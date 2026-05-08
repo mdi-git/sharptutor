@@ -3,7 +3,7 @@ set -eu
 
 cd "$(dirname "$0")"
 
-source .venv/bin/activate
+. .venv/bin/activate
 
 python scripts/infer_with_assistant.py \
   --target_model outputs/gemma4-31b-it-merged \

@@ -50,12 +50,14 @@ def format_conversation(example, tokenizer):
 def main():
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
+    bf16_enabled = bool(args.use_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported())
+    compute_dtype = torch.bfloat16 if bf16_enabled else torch.float16
 
     quant_config = BitsAndBytesConfig(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
         bnb_4bit_use_double_quant=True,
-        bnb_4bit_compute_dtype=torch.bfloat16 if args.use_bf16 else torch.float16,
+        bnb_4bit_compute_dtype=compute_dtype,
     )
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
@@ -66,7 +68,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
         quantization_config=quant_config,
-        torch_dtype=torch.bfloat16 if args.use_bf16 else torch.float16,
+        torch_dtype=compute_dtype,
         device_map="auto",
         attn_implementation="sdpa",
     )
@@ -106,14 +108,14 @@ def main():
         per_device_eval_batch_size=args.per_device_eval_batch_size,
         gradient_accumulation_steps=args.gradient_accumulation_steps,
         learning_rate=args.learning_rate,
-        warmup_ratio=args.warmup_ratio,
+        warmup_steps=max(1, int(args.warmup_ratio * len(dataset["train"]))),
         logging_steps=args.logging_steps,
         save_steps=args.save_steps,
         eval_steps=args.eval_steps,
-        evaluation_strategy="steps" if "eval" in dataset else "no",
+        eval_strategy="steps" if "eval" in dataset else "no",
         save_strategy="steps",
-        bf16=args.use_bf16,
-        fp16=not args.use_bf16,
+        bf16=bf16_enabled,
+        fp16=not bf16_enabled,
         optim="paged_adamw_8bit",
         lr_scheduler_type="cosine",
         max_grad_norm=0.3,
@@ -121,6 +123,9 @@ def main():
         push_to_hub=args.push_to_hub,
         hub_model_id=args.hub_model_id,
     )
+
+    if args.use_bf16 and not bf16_enabled:
+        print("bf16 requested but not supported on this setup; falling back to fp16.")
 
     trainer = SFTTrainer(
         model=model,

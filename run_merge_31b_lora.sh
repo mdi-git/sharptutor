@@ -3,7 +3,7 @@ set -eu
 
 cd "$(dirname "$0")"
 
-source .venv/bin/activate
+. .venv/bin/activate
 
 python scripts/merge_lora.py \
   --base_model google/gemma-4-31B-it \

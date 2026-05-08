@@ -3,7 +3,7 @@ set -eu
 
 cd "$(dirname "$0")"
 
-source .venv/bin/activate
+. .venv/bin/activate
 
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export TOKENIZERS_PARALLELISM=false
@@ -21,5 +21,4 @@ python scripts/train_gemma_sft.py \
   --num_train_epochs 2 \
   --save_steps 50 \
   --eval_steps 50 \
-  --logging_steps 10 \
-  --use_bf16
+  --logging_steps 10
