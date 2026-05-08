@@ -8,9 +8,8 @@ from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
     BitsAndBytesConfig,
-    TrainingArguments,
 )
-from trl import SFTTrainer
+from trl import SFTConfig, SFTTrainer
 
 
 def parse_args():
@@ -101,7 +100,7 @@ def main():
         remove_columns=dataset["train"].column_names,
     )
 
-    training_args = TrainingArguments(
+    training_args = SFTConfig(
         output_dir=args.output_dir,
         num_train_epochs=args.num_train_epochs,
         per_device_train_batch_size=args.per_device_train_batch_size,
@@ -122,6 +121,8 @@ def main():
         report_to="tensorboard",
         push_to_hub=args.push_to_hub,
         hub_model_id=args.hub_model_id,
+        max_length=args.max_seq_length,
+        dataset_text_field="text",
     )
 
     if args.use_bf16 and not bf16_enabled:
@@ -135,7 +136,6 @@ def main():
         peft_config=peft_config,
         processing_class=tokenizer,
         formatting_func=lambda example: example["text"],
-        max_seq_length=args.max_seq_length,
     )
 
     trainer.train()
