@@ -32,6 +32,7 @@ def parse_args():
     parser.add_argument("--lora_alpha", type=int, default=32)
     parser.add_argument("--lora_dropout", type=float, default=0.05)
     parser.add_argument("--use_bf16", action="store_true")
+    parser.add_argument("--use_fp16", action="store_true")
     parser.add_argument("--report_to", default="none")
     parser.add_argument("--push_to_hub", action="store_true")
     parser.add_argument("--hub_model_id", default=None)
@@ -51,6 +52,7 @@ def main():
     args = parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
     bf16_enabled = bool(args.use_bf16 and torch.cuda.is_available() and torch.cuda.is_bf16_supported())
+    fp16_enabled = bool(args.use_fp16 and not bf16_enabled)
     compute_dtype = torch.bfloat16 if bf16_enabled else torch.float16
 
     quant_config = BitsAndBytesConfig(
@@ -68,7 +70,7 @@ def main():
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
         quantization_config=quant_config,
-        torch_dtype=compute_dtype,
+        dtype=compute_dtype,
         device_map="auto",
         attn_implementation="sdpa",
     )
@@ -116,7 +118,7 @@ def main():
         eval_strategy="steps" if "eval" in dataset else "no",
         save_strategy="steps",
         bf16=bf16_enabled,
-        fp16=not bf16_enabled,
+        fp16=fp16_enabled,
         optim="adamw_torch",
         lr_scheduler_type="cosine",
         max_grad_norm=0.3,
@@ -129,6 +131,9 @@ def main():
 
     if args.use_bf16 and not bf16_enabled:
         print("bf16 requested but not supported on this setup; falling back to fp16.")
+        fp16_enabled = True
+        training_args.fp16 = True
+        training_args.bf16 = False
 
     trainer = SFTTrainer(
         model=model,
