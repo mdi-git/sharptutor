@@ -26,8 +26,23 @@
 ```bash
 python3 -m venv .venv
 . .venv/bin/activate
+pip install --upgrade pip
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 pip install -r requirements.txt
 ```
+
+중요:
+
+- `torch`는 서버 드라이버와 CUDA 호환성이 가장 민감하므로 `requirements.txt`에 넣지 않았습니다.
+- 드라이버가 오래된 서버에서는 최신 PyTorch가 GPU를 못 잡을 수 있습니다.
+- 설치 직후 아래 검사를 통과해야 학습을 시작해야 합니다.
+
+```bash
+python -c "import torch; print(torch.__version__); print(torch.version.cuda); print(torch.cuda.is_available())"
+nvidia-smi
+```
+
+`torch.cuda.is_available()`가 `True`가 아니면 학습을 돌리지 말고 PyTorch CUDA wheel 또는 NVIDIA 드라이버를 먼저 맞춰야 합니다.
 
 학습:
 
@@ -36,8 +51,7 @@ python scripts/train_gemma_sft.py \
   --model_name google/gemma-4-31B-it \
   --train_file data/sample_train.jsonl \
   --eval_file data/sample_eval.jsonl \
-  --output_dir outputs/gemma4-31b-it-lora \
-  --use_bf16
+  --output_dir outputs/gemma4-31b-it-lora
 ```
 
 병합:
@@ -46,8 +60,7 @@ python scripts/train_gemma_sft.py \
 python scripts/merge_lora.py \
   --base_model google/gemma-4-31B-it \
   --adapter_path outputs/gemma4-31b-it-lora \
-  --output_dir outputs/gemma4-31b-it-merged \
-  --use_bf16
+  --output_dir outputs/gemma4-31b-it-merged
 ```
 
 assistant drafter를 붙여 추론:
@@ -57,6 +70,7 @@ python scripts/infer_with_assistant.py \
   --target_model outputs/gemma4-31b-it-merged \
   --assistant_model google/gemma-4-31B-it-assistant \
   --prompt "환불 정책 문의에 답하는 가이드를 짧게 써줘."
+```
 
 또는 래퍼 스크립트 사용:
 
@@ -64,7 +78,6 @@ python scripts/infer_with_assistant.py \
 bash run_train_31b_lora.sh
 bash run_merge_31b_lora.sh
 bash run_infer_31b_with_assistant.sh
-```
 ```
 
 ## 데이터 형식
