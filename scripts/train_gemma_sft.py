@@ -3,7 +3,7 @@ import os
 
 import torch
 from datasets import load_dataset
-from peft import LoraConfig
+from peft import LoraConfig, prepare_model_for_kbit_training
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -73,6 +73,7 @@ def main():
         attn_implementation="sdpa",
     )
     model.config.use_cache = False
+    model = prepare_model_for_kbit_training(model)
 
     peft_config = LoraConfig(
         r=args.lora_r,
@@ -116,7 +117,7 @@ def main():
         save_strategy="steps",
         bf16=bf16_enabled,
         fp16=not bf16_enabled,
-        optim="paged_adamw_8bit",
+        optim="adamw_torch",
         lr_scheduler_type="cosine",
         max_grad_norm=0.3,
         report_to=args.report_to,
@@ -138,6 +139,10 @@ def main():
         processing_class=tokenizer,
         formatting_func=lambda example: example["text"],
     )
+
+    trainable_params = sum(p.numel() for p in trainer.model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in trainer.model.parameters())
+    print(f"trainable_params={trainable_params} total_params={total_params}")
 
     trainer.train()
     trainer.save_model(args.output_dir)
