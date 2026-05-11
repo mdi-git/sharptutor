@@ -1,7 +1,7 @@
 import argparse
 
 import torch
-from transformers import AutoModelForCausalLM, AutoProcessor
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
 def parse_args():
@@ -15,15 +15,17 @@ def parse_args():
 
 def main():
     args = parse_args()
-    processor = AutoProcessor.from_pretrained(args.target_model)
+    tokenizer = AutoTokenizer.from_pretrained(args.target_model, use_fast=True)
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
     target_model = AutoModelForCausalLM.from_pretrained(
         args.target_model,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         device_map="auto",
     )
     assistant_model = AutoModelForCausalLM.from_pretrained(
         args.assistant_model,
-        torch_dtype=torch.bfloat16,
+        dtype=torch.bfloat16,
         device_map="auto",
     )
 
@@ -35,13 +37,12 @@ def main():
         {"role": "system", "content": system_text},
         {"role": "user", "content": args.prompt},
     ]
-    text = processor.apply_chat_template(
+    text = tokenizer.apply_chat_template(
         messages,
         tokenize=False,
         add_generation_prompt=True,
-        enable_thinking=args.enable_thinking,
     )
-    inputs = processor(text=text, return_tensors="pt").to(target_model.device)
+    inputs = tokenizer(text, return_tensors="pt").to(target_model.device)
     input_len = inputs["input_ids"].shape[-1]
 
     outputs = target_model.generate(
@@ -51,9 +52,11 @@ def main():
         temperature=1.0,
         top_p=0.95,
         top_k=64,
+        pad_token_id=tokenizer.pad_token_id,
+        eos_token_id=tokenizer.eos_token_id,
     )
-    response = processor.decode(outputs[0][input_len:], skip_special_tokens=False)
-    print(processor.parse_response(response))
+    response = tokenizer.decode(outputs[0][input_len:], skip_special_tokens=True)
+    print(response.strip())
 
 
 if __name__ == "__main__":
